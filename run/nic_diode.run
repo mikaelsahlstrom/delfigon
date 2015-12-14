@@ -24,7 +24,7 @@ assert_spec linux
 
 set build_components {
 	core init drivers/timer drivers/nic
-	test/lwip/http_srv
+	app/nic_diode
 }
 
 build $build_components
@@ -63,19 +63,6 @@ set config {
 			<nic mac="52:54:00:12:34:56" tap="tap-inner"/>
 		</config>
 	</start>
-	<start name="INNER-TEST">
-		<binary name="test-lwip_httpsrv"/>
-		<resource name="RAM" quantum="5M"/>
-		<config ip="10.0.11.15">
-			<libc stdout="/dev/log" stderr="/dev/log">
-				<vfs> <dir name="dev"> <log/> </dir> </vfs>
-			</libc>
-		</config>
-		<route>
-			<service name="Nic"> <child name="INNER-NIC"/> </service>
-			<any-service> <parent/> <any-child/> </any-service>
-		</route>
-	</start>
 
 	<start name="OUTER-NIC">
 		<binary name="nic_drv"/>
@@ -85,16 +72,13 @@ set config {
 			<nic mac="52:54:00:12:34:57" tap="tap-outer"/>
 		</config>
 	</start>
-	<start name="OUTER-TEST">
-		<binary name="test-lwip_httpsrv"/>
+
+	<start name="nic_diode">
 		<resource name="RAM" quantum="5M"/>
-		<config ip="10.0.66.15">
-			<libc stdout="/dev/log" stderr="/dev/log">
-				<vfs> <dir name="dev"> <log/> </dir> </vfs>
-			</libc>
-		</config>
 		<route>
-			<service name="Nic"> <child name="OUTER-NIC"/> </service>
+			<service name="Nic" label="out"> <child name="OUTER-NIC"/> </service>
+			<service name="Nic" label="in"> <child name="INNER-NIC"/> </service>
+
 			<any-service> <parent/> <any-child/> </any-service>
 		</route>
 	</start>
@@ -104,8 +88,7 @@ set config {
 install_config $config
 
 set boot_modules {
-	core init timer nic_drv
-	ld.lib.so libc.lib.so lwip.lib.so test-lwip_httpsrv
+	core init timer nic_drv nic_diode
 }
 
 build_boot_image $boot_modules
