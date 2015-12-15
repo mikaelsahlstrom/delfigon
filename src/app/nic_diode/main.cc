@@ -3,6 +3,7 @@
 #include <base/allocator_avl.h>
 #include <base/printf.h>
 #include <os/server.h>
+#include <os/config.h>
 
 using namespace Genode;
 
@@ -17,6 +18,8 @@ struct Server::Main
 
   size_t bytes_transferred = 0;
   size_t packets_transferred = 0;
+
+  bool verbose = false;
 
   enum { BUF_SIZE = Nic::Packet_allocator::DEFAULT_PACKET_SIZE * 128 };
 
@@ -47,7 +50,18 @@ struct Server::Main
     nic_out.rx_channel()->sigh_ready_to_ack    (packet_dispatcher);
     // There is a packet in the receive queue.
     nic_out.rx_channel()->sigh_packet_avail    (packet_dispatcher);
+
+    handle_config(0);
+
+    config()->sigh(config_dispatcher);
   };
+
+  void handle_config(unsigned)
+  {
+    config()->reload();
+    verbose = config()->xml_node().attribute_value("verbose", false);
+    PDBG("verbose: %d\n", verbose);
+  }
 
   void handle_packet(unsigned)
   {
@@ -107,6 +121,7 @@ struct Server::Main
   }
 
   Signal_rpc_member<Main> packet_dispatcher = { ep, *this, &Main::handle_packet };
+  Signal_rpc_member<Main> config_dispatcher = { ep, *this, &Main::handle_config };
 };
 
 namespace Server
