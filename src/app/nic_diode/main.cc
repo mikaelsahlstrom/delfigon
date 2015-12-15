@@ -15,6 +15,9 @@ struct Server::Main
   Allocator&alloc;
   Entrypoint&ep;
 
+  size_t bytes_transferred = 0;
+  size_t packets_transferred = 0;
+
   enum { BUF_SIZE = Nic::Packet_allocator::DEFAULT_PACKET_SIZE * 128 };
 
   Allocator_avl inner_alloc{&alloc};
@@ -76,11 +79,11 @@ struct Server::Main
       }
       PDBG("outer packet avail\n");
 
-      //size_t const packet_size = nic_out.rx()->peek_packet().size();
+      size_t const packet_size = nic_out.rx()->peek_packet().size();
       Packet_descriptor packet_for_inner;
       try
       {
-        packet_for_inner = nic_in.tx()->alloc_packet(2048);
+        packet_for_inner = nic_in.tx()->alloc_packet(packet_size);
       }
       catch (...)
       {
@@ -91,10 +94,15 @@ struct Server::Main
       Packet_descriptor const packet_from_outer = nic_out.rx()->get_packet();
       Genode::memcpy(nic_in.tx()->packet_content(packet_for_inner),
                      nic_out.rx()->packet_content(packet_from_outer),
-                     2048);
+                     packet_size);
       nic_in.tx()->submit_packet(packet_for_inner);
       nic_out.rx()->acknowledge_packet(packet_from_outer);
-      PDBG("Packet sent\n");
+
+      packets_transferred += 1;
+      bytes_transferred += packet_size;
+
+      PDBG("Packet sent (%lu packets, %lu bytes transferred)\n",
+           packets_transferred, bytes_transferred);
     }
   }
 
