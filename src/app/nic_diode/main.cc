@@ -4,6 +4,7 @@
 #include <base/printf.h>
 #include <os/server.h>
 #include <os/config.h>
+#include <os/reporter.h>
 
 using namespace Genode;
 
@@ -15,6 +16,7 @@ struct Server::Main
 {
   Allocator&alloc;
   Entrypoint&ep;
+  Reporter reporter{"state"};
 
   size_t bytes_transferred = 0;
   size_t packets_transferred = 0;
@@ -54,7 +56,18 @@ struct Server::Main
     handle_config(0);
 
     config()->sigh(config_dispatcher);
+
+    reporter.enabled(true);
+    report_state();
   };
+
+  void report_state(void)
+  {
+    Reporter::Xml_generator xml(reporter, [&] () {
+        xml.attribute("bytes_transferred", bytes_transferred);
+        xml.attribute("packets_transferred", packets_transferred);
+    });
+  }
 
   void handle_config(unsigned)
   {
@@ -115,8 +128,7 @@ struct Server::Main
       packets_transferred += 1;
       bytes_transferred += packet_size;
 
-      PDBG("Packet sent (%lu packets, %lu bytes transferred)\n",
-           packets_transferred, bytes_transferred);
+      report_state();
     }
   }
 
