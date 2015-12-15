@@ -85,32 +85,34 @@ set config {
 			<any-service> <parent/> <any-child/> </any-service>
 		</route>
 	</start>
-   <start name="dynamic_rom">
-     <resource name="RAM" quantum="4M"/>
-     <provides><service name="ROM"/></provides>
-     <config verbose="yes">
-       <rom name="nic_diode.config">
-         <inline>
+
+  <start name="dynamic_rom">
+    <resource name="RAM" quantum="4M"/>
+    <provides><service name="ROM"/></provides>
+    <config verbose="yes">
+      <rom name="nic_diode.config">
+        <inline>
           <config verbose="yes"/>
-         </inline>
-         <sleep milliseconds="2000" />
-         <inline>
+        </inline>
+        <sleep milliseconds="2000" />
+        <inline>
           <config verbose="no"/>
-         </inline>
-         <sleep milliseconds="2000" />
-        </rom>
-       </config>
-      </start>
-   <start name="report_rom">
+        </inline>
+        <sleep milliseconds="2000" />
+      </rom>
+    </config>
+  </start>
+
+  <start name="report_rom">
     <resource name="RAM" quantum="2M"/>
     <provides>
       <service name="ROM"/>
       <service name="Report"/>
-     </provides>
-     <config verbose="yes">
+    </provides>
+    <config verbose="yes">
       <rom/>
-     </config>
-   </start>
+    </config>
+  </start>
 </config>
 }
 
