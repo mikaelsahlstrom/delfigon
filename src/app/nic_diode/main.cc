@@ -78,13 +78,20 @@ struct Server::Main
 
   void handle_packet(unsigned)
   {
-    PDBG("Got packet\n");
+    if (verbose)
+    {
+      PDBG("Got packet\n");
+    }
 
     for (;;)
     {
       while (nic_in.tx()->ack_avail())
       {
-        PDBG("inner release packet\n");
+        if (verbose)
+        {
+          PDBG("inner release packet\n");
+        }
+
         nic_in.tx()->release_packet(nic_in.tx()->get_acked_packet());
       }
 
@@ -92,19 +99,31 @@ struct Server::Main
       {
         return;
       }
-      PDBG("inner ready to submit\n");
+
+      if (verbose)
+      {
+        PDBG("inner ready to submit\n");
+      }
 
       if (!nic_out.rx()->ready_to_ack())
       {
         return;
       }
-      PDBG("outer ready to ack\n");
+
+      if (verbose)
+      {
+        PDBG("outer ready to ack\n");
+      }
 
       if (!nic_out.rx()->packet_avail())
       {
         return;
       }
-      PDBG("outer packet avail\n");
+
+      if (verbose)
+      {
+        PDBG("outer packet avail\n");
+      }
 
       size_t const packet_size = nic_out.rx()->peek_packet().size();
       Packet_descriptor packet_for_inner;
@@ -116,7 +135,11 @@ struct Server::Main
       {
         return;
       }
-      PDBG("inner tx packet alloced\n");
+
+      if (verbose)
+      {
+        PDBG("inner tx packet alloced\n");
+      }
 
       Packet_descriptor const packet_from_outer = nic_out.rx()->get_packet();
       Genode::memcpy(nic_in.tx()->packet_content(packet_for_inner),
