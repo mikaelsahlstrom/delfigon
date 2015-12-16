@@ -133,7 +133,6 @@ set config {
 
   <start name="admin">
     <resource name="RAM" quantum="4M"/>
-    <provides><service name="ROM"/></provides>
     <route>
       <service name="ROM"> <child name="status"/></service>
       <service name="Report"> <child name="config"/></service>
