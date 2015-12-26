@@ -34,24 +34,24 @@ struct Server::Main
   Main(Allocator&alloc, Entrypoint &ep) : alloc(alloc), ep(ep)
   {
     // There is room in the send queue.
-    nic_in.tx_channel()->sigh_ready_to_submit (packet_dispatcher);
+    nic_in.tx_channel()->sigh_ready_to_submit(packet_dispatcher);
     // There is a ack in the ack queue.
-    nic_in.tx_channel()->sigh_ack_avail       (packet_dispatcher);
+    nic_in.tx_channel()->sigh_ack_avail(packet_dispatcher);
 
     // There is room in the ack queue.
-    nic_in.rx_channel()->sigh_ready_to_ack    (packet_dispatcher);
+    nic_in.rx_channel()->sigh_ready_to_ack(packet_dispatcher);
     // There is a packet in the receive queue.
-    nic_in.rx_channel()->sigh_packet_avail    (packet_dispatcher);
+    nic_in.rx_channel()->sigh_packet_avail(packet_dispatcher);
 
     // There is room in the send queue.
-    nic_out.tx_channel()->sigh_ready_to_submit (packet_dispatcher);
+    nic_out.tx_channel()->sigh_ready_to_submit(packet_dispatcher);
     // There is a ack in the ack queue.
-    nic_out.tx_channel()->sigh_ack_avail       (packet_dispatcher);
+    nic_out.tx_channel()->sigh_ack_avail(packet_dispatcher);
 
     // There is room in the ack queue.
-    nic_out.rx_channel()->sigh_ready_to_ack    (packet_dispatcher);
+    nic_out.rx_channel()->sigh_ready_to_ack(packet_dispatcher);
     // There is a packet in the receive queue.
-    nic_out.rx_channel()->sigh_packet_avail    (packet_dispatcher);
+    nic_out.rx_channel()->sigh_packet_avail(packet_dispatcher);
 
     handle_config(0);
 
@@ -78,20 +78,10 @@ struct Server::Main
 
   void handle_packet(unsigned)
   {
-    if (verbose)
-    {
-      PDBG("Got packet\n");
-    }
-
     for (;;)
     {
       while (nic_in.tx()->ack_avail())
       {
-        if (verbose)
-        {
-          PDBG("inner release packet\n");
-        }
-
         nic_in.tx()->release_packet(nic_in.tx()->get_acked_packet());
       }
 
@@ -100,29 +90,14 @@ struct Server::Main
         return;
       }
 
-      if (verbose)
-      {
-        PDBG("inner ready to submit\n");
-      }
-
       if (!nic_out.rx()->ready_to_ack())
       {
         return;
       }
 
-      if (verbose)
-      {
-        PDBG("outer ready to ack\n");
-      }
-
       if (!nic_out.rx()->packet_avail())
       {
         return;
-      }
-
-      if (verbose)
-      {
-        PDBG("outer packet avail\n");
       }
 
       size_t const packet_size = nic_out.rx()->peek_packet().size();
@@ -136,11 +111,6 @@ struct Server::Main
         return;
       }
 
-      if (verbose)
-      {
-        PDBG("inner tx packet alloced\n");
-      }
-
       Packet_descriptor const packet_from_outer = nic_out.rx()->get_packet();
       Genode::memcpy(nic_in.tx()->packet_content(packet_for_inner),
                      nic_out.rx()->packet_content(packet_from_outer),
@@ -151,7 +121,10 @@ struct Server::Main
       packets_transferred += 1;
       bytes_transferred += packet_size;
 
-      report_state();
+      if (vebose)
+      {
+        report_state();
+      }
     }
   }
 
@@ -162,7 +135,7 @@ struct Server::Main
 namespace Server
 {
   char const *name() { return "nic_diode"; }
-  size_t stack_size() { return 2*1024*sizeof(long); }
+  size_t stack_size() { return 2 * 1024 * sizeof(long); }
 
   void construct(Entrypoint &ep)
   {
