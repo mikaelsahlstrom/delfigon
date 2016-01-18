@@ -51,7 +51,8 @@ public:
 	{
 		assert(state_ != nullptr);
 		event_ = e;
-		state_->handler(*static_cast<Hsm*>(this));
+		state_->do_handler(*static_cast<Hsm*>(this));
+		state_->event_handler(*static_cast<Hsm*>(this));
 	}
 };
 } /* namespace hsm */

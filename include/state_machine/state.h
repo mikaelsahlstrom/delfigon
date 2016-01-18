@@ -17,29 +17,36 @@ template<typename H>
 struct Top
 {
 	typedef H Hsm;
-	typedef void Base;
+	typedef void Parent;
 
-	virtual void handler(Hsm &) const = 0;
+	virtual void event_handler(Hsm &) const = 0;
+	virtual void do_handler(Hsm &) const = 0;
 	virtual unsigned get_id() const = 0;
 };
 
-template<typename H, unsigned ID, typename B> struct Composite;
+template<typename H, unsigned ID, typename P> struct Composite;
 
-template<typename H, unsigned ID, typename B = Composite<H, 0, Top<H>>>
-struct Composite : B
+template<typename H, unsigned ID, typename P = Composite<H, 0, Top<H>>>
+struct Composite : P
 {
 	typedef H Hsm;
-	typedef B Base;
-	typedef Composite<Hsm, ID, Base> This;
+	typedef P Parent;
+	typedef Composite<Hsm, ID, Parent> This;
 
-	template<typename LEAF>
-	void handle(Hsm & h, const LEAF & l) const
+	virtual void do_handler(Hsm & h) const
+		{
+			Parent::do_handler(h);
+			handle_do(h, * this);
+		};
+
+	template<typename LEAF>	void handle_do(Hsm & h, const LEAF & l) const {}
+	template<typename LEAF>	void handle_event(Hsm & h, const LEAF & l) const
 	{
-		Base::handle(h, l);
+		Parent::handle_event(h, l);
 	}
-	static void entry(Hsm &) {}
-	static void init(Hsm &);
-	static void exit(Hsm &) {}
+	static void handle_entry(Hsm &) {}
+	static void handle_init(Hsm &);
+	static void handle_exit(Hsm &) {}
 };
 
 // Specialization for the top state
@@ -47,77 +54,87 @@ template<typename H>
 struct Composite<H, 0, Top<H>> : Top<H>
 {
 	typedef H Hsm;
-	typedef Top<Hsm> Base;
-	typedef Composite<Hsm, 0, Base> This;
+	typedef Top<Hsm> Parent;
+	typedef Composite<Hsm, 0, Parent> This;
 
-	template<typename THIS>
-	void handle(Hsm &, const THIS &) const {}
-	static void entry(Hsm &) {}
-	static void init(Hsm &); // no implementation
-	static void exit(Hsm &) {}
+	virtual void do_handler(Hsm &) const {};
+	template<typename THIS>	void handle_do   (Hsm &, const THIS &) const {}
+	template<typename THIS>	void handle_event(Hsm &, const THIS &) const {}
+	static void handle_entry(Hsm &) {}
+	static void handle_init(Hsm &); // no implementation
+	static void handle_exit(Hsm &) {}
 };
 
-template<typename H, unsigned ID, typename B = Composite<H, 0, Top<H>>>
-struct Leaf : B
+template<typename H, unsigned ID, typename P = Composite<H, 0, Top<H>>>
+struct Leaf : P
 {
 	typedef H Hsm;
-	typedef B Base;
-	typedef Leaf<Hsm, ID, Base> This;
+	typedef P Parent;
+	typedef Leaf<Hsm, ID, Parent> This;
 	
-	template<typename THIS>
-	void handle(Hsm & h, const THIS & t) const
+	virtual void do_handler(Hsm & h) const override
 	{
-		Base::handle(h, t);
+		Parent::do_handler(h);
+		handle_do(h, * this);
 	}
-	virtual void handler(Hsm & h) const override 
+	template<typename THIS>
+	void handle_do(Hsm & h, const THIS & t) const
 	{
-		handle(h, * this);
+	}
+	template<typename THIS>
+	void handle_event(Hsm & h, const THIS & t) const
+	{
+		Parent::handle_event(h, t);
+	}
+	virtual void event_handler(Hsm & h) const override 
+	{
+		handle_event(h, * this);
 	}
 	virtual unsigned get_id() const override
 	{
 		return ID;
 	}
-	static void init(Hsm & h)
+	static void handle_init(Hsm & h)
 	{
 		h.next(obj);
 	}
 	// don't specialize this
-	static void entry(Hsm &) {}
-	static void exit(Hsm &) {}
+	static void handle_entry(Hsm &) {}
+	static void handle_exit(Hsm &) {}
 	static const Leaf obj;
 };
 
-template<typename H, unsigned ID, typename B> 
-const Leaf<H, ID, B> Leaf<H, ID, B>::obj;
+template<typename H, unsigned ID, typename P> 
+const Leaf<H, ID, P> Leaf<H, ID, P>::obj;
 
 template<bool> class Bool {};
 
-template<typename D, typename B>
-class Is_derived
+template<typename C, typename P>
+class Is_child
 {
-	typedef D Derived;
-	typedef B Base;
+	typedef C Child;
+	typedef P Parent;
 	
 	class Yes {	char a[1]; };
 	class No  {	char a[5]; };
-	static Yes test( Base * ); // undefined
+	static Yes test( Parent * ); // undefined
 	static No test( ... );    // undefined
 public:
-	enum { Res = sizeof(test(static_cast<Derived *>(0))) == sizeof(Yes) ? 1 : 0 };
+	enum { Res = sizeof(test(static_cast<Child *>(0))) == sizeof(Yes) ? 1 : 0 };
 };
 
-template<typename D>
+template<typename C>
 struct Init
 {
-	typedef D Derived;
-	typedef typename D::Hsm Hsm;
+	typedef C Child;
+	typedef typename C::Hsm Hsm;
 
 	Init(Hsm & h)
 		: hsm_(h) {}
 	~Init()
 	{
-		Derived::entry(hsm_);
-		Derived::init(hsm_);
+		Child::handle_entry(hsm_);
+		Child::handle_init(hsm_);
 	}
 	Hsm & hsm_;
 };
@@ -129,13 +146,13 @@ struct Transition
 	typedef S Source;
 	typedef T Target;
 	typedef typename Current::Hsm Hsm;
-	typedef typename Current::Base Current_base;
-	typedef typename Target::Base Target_base;
+	typedef typename Current::Parent Current_parent;
+	typedef typename Target::Parent Target_parent;
 	enum { // work out when to terminate template recursion
-		eTB_CB = Is_derived<Target_base, Current_base>::Res,
-		eS_CB  = Is_derived<S, Current_base>::Res,
-		eS_C   = Is_derived<S, C>::Res,
-		eC_S   = Is_derived<C, S>::Res,
+		eTB_CB = Is_child<Target_parent, Current_parent>::Res,
+		eS_CB  = Is_child<S, Current_parent>::Res,
+		eS_C   = Is_child<S, C>::Res,
+		eC_S   = Is_child<C, S>::Res,
 		exitStop = eTB_CB && eS_C,
 		entryStop = eS_C || eS_CB && !eC_S
 	};
@@ -149,7 +166,7 @@ struct Transition
 		typedef Transition<Target, Source, Target> Trans;
 
 		Trans::entry_actions(hsm_, Bool<false>());
-		T::init(hsm_);
+		T::handle_init(hsm_);
 	}
 	// We use overloading to stop recursion. The more natural template
 	// specialization method would require to specialize the inner
@@ -158,18 +175,18 @@ struct Transition
 	static void exit_actions(Hsm &, Bool<true>) {}
 	static void exit_actions(Hsm & h, Bool<false>)
 	{
-		typedef Transition<Current_base, Source, Target> Trans; 
+		typedef Transition<Current_parent, Source, Target> Trans; 
 
-		C::exit(h);
+		C::handle_exit(h);
 		Trans::exit_actions(h, Bool<exitStop>());
 	}
 	static void entry_actions(Hsm &, Bool<true>) {}
 	static void entry_actions(Hsm & h, Bool<false>)
 	{
-		typedef Transition<Current_base, Source, Target> Trans; 
+		typedef Transition<Current_parent, Source, Target> Trans; 
 
 		Trans::entry_actions(h, Bool<entryStop>());
-		C::entry(h);
+		C::handle_entry(h);
 	}
 
 private:

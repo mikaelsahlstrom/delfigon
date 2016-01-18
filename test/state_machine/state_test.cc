@@ -55,12 +55,18 @@ typedef hsm::state::Leaf     <Simple_hsm, 6, S21>  S211;
  * different parts of the handler function. */
 template<>
 template<typename LEAF>
-inline void test::S0::handle(test::Simple_hsm & h, const LEAF & l) const
+inline void test::S0::handle_do(test::Simple_hsm & h, const LEAF & l) const
+{
+	std::cout << "Do(S0) - ";
+}
+
+template<>
+template<typename LEAF>
+inline void test::S0::handle_event(test::Simple_hsm & h, const LEAF & l) const
 {
 	using hsm::state::Transition;
 	using namespace test;
-	/* UML do/ processing goes here and happens whenever an event is
-	 * received */
+
 	switch(h.get_event()) {
     case Event::E:
 	{
@@ -77,12 +83,12 @@ inline void test::S0::handle(test::Simple_hsm & h, const LEAF & l) const
     default:
 		break;
 	}
-	return Base::handle(h, l);
+	Parent::handle_event(h, l);
 }
 
 template<>
 template<typename LEAF>
-inline void test::S1::handle(test::Simple_hsm & h, const LEAF & l) const
+inline void test::S1::handle_event(test::Simple_hsm & h, const LEAF & l) const
 {
 	using hsm::state::Transition;
 	using namespace test;
@@ -120,12 +126,19 @@ inline void test::S1::handle(test::Simple_hsm & h, const LEAF & l) const
     default:
 		break;
   }
-  return Base::handle(h, l);
+  Parent::handle_event(h, l);
 }
 
 template<>
 template<typename LEAF>
-inline void test::S11::handle(test::Simple_hsm & h, const LEAF & l) const
+inline void test::S11::handle_do(test::Simple_hsm & h, const LEAF & l) const
+{
+	std::cout << "Do(S11) - ";
+}
+
+template<>
+template<typename LEAF>
+inline void test::S11::handle_event(test::Simple_hsm & h, const LEAF & l) const
 {
 	using hsm::state::Transition;
 	using namespace test;
@@ -147,12 +160,12 @@ inline void test::S11::handle(test::Simple_hsm & h, const LEAF & l) const
     default:
 		break;
 	}
-	return Base::handle(h, l);
+	Parent::handle_event(h, l);
 }
 
 template<>
 template<typename LEAF>
-inline void test::S2::handle(test::Simple_hsm & h, const LEAF & l) const
+inline void test::S2::handle_event(test::Simple_hsm & h, const LEAF & l) const
 {
 	using hsm::state::Transition;
 	using namespace test;
@@ -172,12 +185,12 @@ inline void test::S2::handle(test::Simple_hsm & h, const LEAF & l) const
 	}
     default: break;
 	}
-	return Base::handle(h, l);
+	Parent::handle_event(h, l);
 }
 
 template<>
 template<typename LEAF>
-inline void test::S21::handle(test::Simple_hsm & h, const LEAF & l) const
+inline void test::S21::handle_event(test::Simple_hsm & h, const LEAF & l) const
 {
 	using hsm::state::Transition;
 	using namespace test;
@@ -200,12 +213,19 @@ inline void test::S21::handle(test::Simple_hsm & h, const LEAF & l) const
 	default:
 		break;
   }
-  return Base::handle(h, l);
+  Parent::handle_event(h, l);
 }
 
 template<>
 template<typename LEAF>
-inline void test::S211::handle(test::Simple_hsm & h, const LEAF & l) const
+inline void test::S211::handle_do(test::Simple_hsm & h, const LEAF & l) const
+{
+	std::cout << "Do(S211) - ";
+}
+
+template<>
+template<typename LEAF>
+inline void test::S211::handle_event(test::Simple_hsm & h, const LEAF & l) const
 {
 	using hsm::state::Transition;
 	using namespace test;
@@ -226,105 +246,105 @@ inline void test::S211::handle(test::Simple_hsm & h, const LEAF & l) const
     default:
 		break;
 	}
-	return Base::handle(h, l);
+	Parent::handle_event(h, l);
 }
 
 namespace hsm {
 namespace state {
 // Top -------------------------------------------------------------------------
 template<>
-inline void test::Top::init(test::Simple_hsm & arg)
+inline void test::Top::handle_init(test::Simple_hsm & arg)
 {
 	std::cout << "Init(Top) - ";
 	Init<test::S0> tmp(arg);
 }
 // S0 --------------------------------------------------------------------------
 template<>
-inline void test::S0::entry(test::Simple_hsm &)
+inline void test::S0::handle_entry(test::Simple_hsm &)
 {
 	std::cout << "Entry(S0) - ";
 }
 template<>
-inline void test::S0::init(test::Simple_hsm & arg)
+inline void test::S0::handle_init(test::Simple_hsm & arg)
 {
 	std::cout << "Init(S0) - ";
 	Init<test::S1> tmp(arg);
 }
 template<>
-inline void test::S0::exit(test::Simple_hsm &)
+inline void test::S0::handle_exit(test::Simple_hsm &)
 {
 	std::cout << "Exit(S0) - ";
 }
 // S1 --------------------------------------------------------------------------
 template<>
-inline void test::S1::entry(test::Simple_hsm &)
+inline void test::S1::handle_entry(test::Simple_hsm &)
 {
 	std::cout << "Entry(S1) - ";
 }
 template<>
-inline void test::S1::init(test::Simple_hsm & arg)
+inline void test::S1::handle_init(test::Simple_hsm & arg)
 {
 	std::cout << "Init(S1) - ";
 	Init<test::S11> tmp(arg);
 }
 template<>
-inline void test::S1::exit(test::Simple_hsm &)
+inline void test::S1::handle_exit(test::Simple_hsm &)
 {
 	std::cout << "Exit(S1) - ";
 }
 // S11 -------------------------------------------------------------------------
 template<>
-inline void test::S11::entry(test::Simple_hsm &)
+inline void test::S11::handle_entry(test::Simple_hsm &)
 {
 	std::cout << "Entry(S11) - ";
 }
 template<>
-inline void test::S11::exit(test::Simple_hsm &)
+inline void test::S11::handle_exit(test::Simple_hsm &)
 {
 	std::cout << "Exit(S11) - ";
 }
 // S2 --------------------------------------------------------------------------
 template<>
-inline void test::S2::entry(test::Simple_hsm &)
+inline void test::S2::handle_entry(test::Simple_hsm &)
 {
 	std::cout << "Entry(S2) - ";
 }
 template<>
-inline void test::S2::init(test::Simple_hsm & arg)
+inline void test::S2::handle_init(test::Simple_hsm & arg)
 {
 	std::cout << "Init(S2) - ";
 	Init<test::S21> tmp(arg);
 }
 template<>
-inline void test::S2::exit(test::Simple_hsm &)
+inline void test::S2::handle_exit(test::Simple_hsm &)
 {
 	std::cout << "Exit(S2) - ";
 }
 // S21 -------------------------------------------------------------------------
 template<>
-inline void test::S21::entry(test::Simple_hsm &)
+inline void test::S21::handle_entry(test::Simple_hsm &)
 {
 	std::cout << "Entry(S21) - ";
 }
 template<>
-inline void test::S21::init(test::Simple_hsm & arg)
+inline void test::S21::handle_init(test::Simple_hsm & arg)
 {
 	std::cout << "Init(S21) - ";
 	Init<test::S211> tmp(arg);
 }
 template<>
-inline void test::S21::exit(test::Simple_hsm &)
+inline void test::S21::handle_exit(test::Simple_hsm &)
 {
 	std::cout << "Exit(S21) - ";
 }
 // S211 ------------------------------------------------------------------------
 template<>
-inline void test::S211::entry(test::Simple_hsm &)
+inline void test::S211::handle_entry(test::Simple_hsm &)
 {
 	std::cout << "Entry(S211) - ";
 }
 template<>
-inline void test::S211::exit(test::Simple_hsm &)
+inline void test::S211::handle_exit(test::Simple_hsm &)
 {
 	std::cout << "Exit(S211) - ";
 }
@@ -334,7 +354,7 @@ inline void test::S211::exit(test::Simple_hsm &)
 int main()
 {
 	test::Simple_hsm test;
-	test::Top::init(test);
+	test::Top::handle_init(test);
 	for(;;) {
 		std::cout << "\nEvent: ";
 		char c;
