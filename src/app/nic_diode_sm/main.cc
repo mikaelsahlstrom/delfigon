@@ -110,7 +110,6 @@ public:
 	Downstream_port   dsp;          /* Downstream port */
 };
 
-
 namespace hsm { namespace state {
 /******************************************************************************
  ** Top state definition
@@ -142,14 +141,12 @@ namespace hsm { namespace state {
 	inline void
 	Server::Operating::handle_event(Server::Diode & h, const LEAF & l) const
 	{
-		PDBG("Server::Operating::handle_init\n");
-		using hsm::state::Transition;
+		PDBG("Server::Operating::handle_event\n");
 		switch(h.get_event()) {
 		case Server::Event::REPORT_STATUS:
 		{
-			PDBG("Got event REPORT_STATUS\n");
+			PDBG("Handling event REPORT_STATUS\n");
 			h.report_status();
-			PDBG("Status is reported\n");
 			return;
 		}
 		default:
@@ -171,9 +168,10 @@ namespace hsm { namespace state {
 		switch(h.get_event()) {
 		case Server::Event::CONFIG_UPDATED:
 		{
+			PDBG("Handling event CONFIG_UPDATED\n");
 			h.update_config();
 			if (! h.cfg.blocking) {
-				hsm::state::Transition<LEAF, This, Server::Streaming> t(h);
+				Transition<LEAF, This, Server::Streaming> t(h);
 			}
 			return;
 		}
@@ -195,9 +193,10 @@ namespace hsm { namespace state {
 		switch(h.get_event()) {
 		case Server::Event::CONFIG_UPDATED:
 		{
+			PDBG("Handling event CONFIG_UPDATED\n");
 			h.update_config();
 			if (h.cfg.blocking) {
-				hsm::state::Transition<LEAF, This, Server::Blocking> t(h);
+				Transition<LEAF, This, Server::Blocking> t(h);
 			}
 			return;
 		}
@@ -207,9 +206,12 @@ namespace hsm { namespace state {
 			return;
 		}
 		case Server::Event::US_PKT_SUBMITTED:
+			PDBG("Handling event US_PKT_SUBMITTED\n");
 		case Server::Event::US_ACK_EXTRACTED:
+			PDBG("Handling event US_ACK_EXTRACTED\n");
 		case Server::Event::DS_PKT_EXTRACTED:
 		{
+			PDBG("Handling event DS_PKT_EXTRACTED\n");
 			h.forward_pkts();
 			return;
 		}
@@ -236,7 +238,6 @@ Genode::size_t Server::stack_size()
 
 void Server::construct(Entrypoint & ep)
 {	
-	 PDBG("Diode not constructed\n");
 	 static Diode diode(* env()->heap(), ep);
 	 Server::Top::handle_init(diode);
 	 PDBG("Diode constructed\n");
@@ -280,7 +281,6 @@ Server::Diode::Config::Config()
  ******************************************************************************/
 void Server::Diode::connect_signals()
 {
-	PDBG("Server::Diode::connect_signals\n");
    config()->sigh(_config_updated);	
 	status_timer.sigh(_report_status);	
 	usp.nic.rx_channel()->sigh_packet_avail   (_us_pkt_submitted);
@@ -295,7 +295,6 @@ void Server::Diode::dispatch(unsigned nsignals)
 	PDBG("Server::Diode::dispatch; Received signal %d\n", static_cast<unsigned>(E));
 	_nsignals = nsignals;
 	Base::dispatch(E);
-	PDBG("Server::Diode::dispatch, after; %d\n", static_cast<unsigned>(E));
 }
 
 Server::Diode::Diode(Allocator & a, Entrypoint & ep)
@@ -314,7 +313,7 @@ Server::Diode::Diode(Allocator & a, Entrypoint & ep)
 	  usp               (a, BUF_SZ, "out"),
 	  dsp               (a, BUF_SZ, "in")
 {
-	PDBG("Server::Diode::Diode\n");
+	_reporter.enabled(true);
 	connect_signals();
 };
 
@@ -325,25 +324,22 @@ void Server::Diode::update_config()
 	cfg.verbose = config()->xml_node().attribute_value("verbose", false);
 	cfg.report_period = config()->xml_node().attribute_value("report_interval", 1000000u);
 	status_timer.trigger_periodic(cfg.report_period);
-	PDBG("cfg.     blocking: %d\n", cfg.blocking);
-	PDBG("cfg.      verbose: %d\n", cfg.verbose);
+	PDBG("cfg.blocking:      %d\n", cfg.blocking);
+	PDBG("cfg.verbose:       %d\n", cfg.verbose);
 	PDBG("cfg.report_period: %d\n", cfg.report_period);
 }
 
 void Server::Diode::report_status()
 {
-	PDBG("Entering Server::Diode::report_status()\n");
 	Reporter::Xml_generator xml(_reporter, [&] () {
 			xml.attribute("StreamedBytes", _bytes_streamed);
 			xml.attribute("StreamedPkts", _pkts_streamed);
 		});
-	PDBG("Leaving Server::Diode::report_status()\n");
 }
 
 void Server::Diode::receive_acks()
 {
 	while (dsp.nic.tx()->ack_avail())	{
-		PDBG("downstream release packet\n");
 		dsp.nic.tx()->release_packet(dsp.nic.tx()->get_acked_packet());
 	}
 }
