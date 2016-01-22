@@ -20,21 +20,31 @@ class Simple_hsm : public hsm::Basic<Simple_hsm, Event>
 {
 public:
 	Simple_hsm()
-		: foo_ (0)
+		: _foo (0),
+		  _event_cnt (0)
 		{};
 	~Simple_hsm()
 		{};
+	void inc_event_cnt()
+		{
+			_event_cnt++;
+		}
+	unsigned get_event_cnt() const
+		{
+			return _event_cnt;
+		}
 	void foo(int i)
 		{
-			foo_ = i;
+			_foo = i;
 		}
 	int foo() const
 		{
-			return foo_;
+			return _foo;
 		}
 
 private:
-	int foo_;
+	int _foo;
+	unsigned _event_cnt;
 };
 
 /**
@@ -57,7 +67,8 @@ template<>
 template<typename LEAF>
 inline void test::S0::handle_do(test::Simple_hsm & h, const LEAF & l) const
 {
-	std::cout << "Do(S0) - ";
+	h.inc_event_cnt();
+	std::cout << "Do(S0: " << h.get_event_cnt() << ") - ";
 }
 
 template<>

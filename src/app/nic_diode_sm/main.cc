@@ -23,8 +23,8 @@ namespace Server
 	 ****************************************************************************/
 	typedef hsm::state::Composite<Diode, 0>            Top;
 	typedef hsm::state::Composite<Diode, 1, Top>       Operating;
-	typedef hsm::state::Leaf     <Diode, 1, Operating> Blocking;
-	typedef hsm::state::Leaf     <Diode, 1, Operating> Streaming;
+	typedef hsm::state::Leaf     <Diode, 2, Operating> Blocking;
+	typedef hsm::state::Leaf     <Diode, 3, Operating> Streaming;
 }
 
 /******************************************************************************
@@ -110,149 +110,6 @@ public:
 	Downstream_port   dsp;          /* Downstream port */
 };
 
-/******************************************************************************
- ** Server definitions
- ******************************************************************************/
-char const * Server::name()
-{
-	return "nic_diode_sm";
-}
-
-Genode::size_t Server::stack_size()
-{
-	return 2 * 1024 * sizeof(long);
-}
-
-void Server::construct(Entrypoint & ep)
-{	
-	 PDBG("Diode not constructed yet \n");
-	 static Diode diode(* env()->heap(), ep);
-	 PDBG("Diode constructed\n");
-}
-
-/******************************************************************************
- ** Stream_port definition
- ******************************************************************************/
-Server::Diode::Stream_port::Stream_port(Allocator & a,
-													 Genode::size_t upstream_buf_sz,
-													 Genode::size_t downstream_buf_sz,
-													 const char *   label)
-	
-	: alloc (& a),
-	  nic   (& alloc, upstream_buf_sz, downstream_buf_sz, label)
-{}
-
-Server::Diode::Upstream_port::Upstream_port(Allocator & a,
-														  Genode::size_t buf_sz,
-														  const char * label)
-	: Stream_port(a, 0, buf_sz, label)
-{}
-
-Server::Diode::Downstream_port::Downstream_port(Allocator & a,
-																Genode::size_t buf_sz,
-																const char * label)
-	: Stream_port(a, buf_sz, 0, label)
-{}
-
-/******************************************************************************
- ** Config definition
- ******************************************************************************/
-Server::Diode::Config::Config()
-	: blocking      (true),
-	  verbose       (false),
-	  report_period (10000000)
-{}
-
-/******************************************************************************
- ** Diode definition
- ******************************************************************************/
-void Server::Diode::connect_signals()
-{
-	PDBG("Server::Diode::connect_signals\n");
-   config()->sigh(_config_updated);	
-	status_timer.sigh(_report_status);	
-	usp.nic.rx_channel()->sigh_packet_avail   (_us_pkt_submitted);
-	usp.nic.rx_channel()->sigh_ready_to_ack   (_us_ack_extracted);
-	dsp.nic.tx_channel()->sigh_ready_to_submit(_ds_pkt_extracted);
-	dsp.nic.tx_channel()->sigh_ack_avail      (_ds_ack_submitted);
-}	
-
-template<Server::Event E>
-void Server::Diode::dispatch(unsigned nsignals)
-{
-	PDBG("Server::Diode::dispatch; %d\n", static_cast<unsigned>(E));
-	_nsignals = nsignals;
-	Base::dispatch(E);
-}
-
-Server::Diode::Diode(Allocator & a, Entrypoint & ep)
-	: _reporter         ("status"),
-	  _bytes_streamed   (0),
-	  _pkts_streamed    (0),
-	  _nsignals         (0),
-	  _config_updated   (ep, * this, & Diode::dispatch<Event::CONFIG_UPDATED>),
-	  _report_status    (ep, * this, & Diode::dispatch<Event::REPORT_STATUS>),
-	  _us_pkt_submitted (ep, * this, & Diode::dispatch<Event::US_PKT_SUBMITTED>),
-	  _us_ack_extracted (ep, * this, & Diode::dispatch<Event::US_ACK_EXTRACTED>),
-	  _ds_pkt_extracted (ep, * this, & Diode::dispatch<Event::DS_PKT_EXTRACTED>),
-	  _ds_ack_submitted (ep, * this, & Diode::dispatch<Event::DS_ACK_SUBMITTED>),
-	  cfg               (),
-	  status_timer      (),
-	  usp               (a, BUF_SZ, "out"),
-	  dsp               (a, BUF_SZ, "in")
-{
-	connect_signals();
-};
-
-void Server::Diode::update_config()
-{
-	config()->reload();
-	cfg.blocking = config()->xml_node().attribute_value("blocking", false);
-	cfg.verbose = config()->xml_node().attribute_value("verbose", false);
-	cfg.report_period = config()->xml_node().attribute_value("report_interval", 1000000u);
-	status_timer.trigger_periodic(cfg.report_period);
-	PDBG("blocking: %d\n", cfg.blocking);
-	PDBG("verbose: %d\n", cfg.verbose);
-	PDBG("report_interval: %d\n", cfg.report_period);
-}
-
-void Server::Diode::report_status()
-{
-	Reporter::Xml_generator xml(_reporter, [&] () {
-			xml.attribute("StreamedBytes", _bytes_streamed);
-			xml.attribute("StreamedPkts", _pkts_streamed);
-		});
-}
-
-void Server::Diode::receive_acks()
-{
-	while (dsp.nic.tx()->ack_avail())	{
-		PDBG("downstream release packet\n");
-		dsp.nic.tx()->release_packet(dsp.nic.tx()->get_acked_packet());
-	}
-}
-
-void Server::Diode::forward_pkts()
-{
-	while (usp.nic.rx()->packet_avail()
-			 && usp.nic.rx()->ready_to_ack()
-			 && dsp.nic.tx()->ready_to_submit()) {
-		Packet_descriptor const us_pkt = usp.nic.rx()->get_packet();
-		Packet_descriptor ds_pkt;
-		try {
-			ds_pkt = dsp.nic.tx()->alloc_packet(us_pkt.size());
-		}
-		catch (...) {
-			return;
-		}
-		Genode::memcpy(dsp.nic.tx()->packet_content(ds_pkt),
-							usp.nic.rx()->packet_content(us_pkt), us_pkt.size());
-		dsp.nic.tx()->submit_packet(ds_pkt);
-		usp.nic.rx()->acknowledge_packet(us_pkt);
-		_pkts_streamed++;
-		_bytes_streamed += us_pkt.size();
-	}
-}
 
 namespace hsm { namespace state {
 /******************************************************************************
@@ -264,7 +121,7 @@ namespace hsm { namespace state {
 		PDBG("Server::Top::handle_init\n");
 		Init<Server::Operating> t(arg);
 	}
-
+	
 /******************************************************************************
  ** Operating definition
  ******************************************************************************/
@@ -290,7 +147,9 @@ namespace hsm { namespace state {
 		switch(h.get_event()) {
 		case Server::Event::REPORT_STATUS:
 		{
+			PDBG("Got event REPORT_STATUS\n");
 			h.report_status();
+			PDBG("Status is reported\n");
 			return;
 		}
 		default:
@@ -308,6 +167,7 @@ namespace hsm { namespace state {
 	Server::Blocking::handle_event(Server::Diode & h, const LEAF & l) const
 	{
 		PDBG("Server::Blocking::handle_event\n");
+		PDBG("Got event no: %d\n", h.get_event());
 		switch(h.get_event()) {
 		case Server::Event::CONFIG_UPDATED:
 		{
@@ -359,4 +219,153 @@ namespace hsm { namespace state {
 		Parent::handle_event(h, l);
 	}
 }
+}
+
+/******************************************************************************
+ ** Server definitions
+ ******************************************************************************/
+char const * Server::name()
+{
+	return "nic_diode_sm";
+}
+
+Genode::size_t Server::stack_size()
+{
+	return 2 * 1024 * sizeof(long);
+}
+
+void Server::construct(Entrypoint & ep)
+{	
+	 PDBG("Diode not constructed\n");
+	 static Diode diode(* env()->heap(), ep);
+	 Server::Top::handle_init(diode);
+	 PDBG("Diode constructed\n");
+}
+
+/******************************************************************************
+ ** Stream_port definition
+ ******************************************************************************/
+Server::Diode::Stream_port::Stream_port(Allocator & a,
+													 Genode::size_t upstream_buf_sz,
+													 Genode::size_t downstream_buf_sz,
+													 const char *   label)
+	
+	: alloc (& a),
+	  nic   (& alloc, upstream_buf_sz, downstream_buf_sz, label)
+{}
+
+Server::Diode::Upstream_port::Upstream_port(Allocator & a,
+														  Genode::size_t buf_sz,
+														  const char * label)
+	: Stream_port(a, buf_sz, buf_sz, label)
+{}
+
+Server::Diode::Downstream_port::Downstream_port(Allocator & a,
+																Genode::size_t buf_sz,
+																const char * label)
+	: Stream_port(a, buf_sz, buf_sz, label)
+{}
+
+/******************************************************************************
+ ** Config definition
+ ******************************************************************************/
+Server::Diode::Config::Config()
+	: blocking      (true),
+	  verbose       (false),
+	  report_period (10000000)
+{}
+
+/******************************************************************************
+ ** Diode definition
+ ******************************************************************************/
+void Server::Diode::connect_signals()
+{
+	PDBG("Server::Diode::connect_signals\n");
+   config()->sigh(_config_updated);	
+	status_timer.sigh(_report_status);	
+	usp.nic.rx_channel()->sigh_packet_avail   (_us_pkt_submitted);
+	usp.nic.rx_channel()->sigh_ready_to_ack   (_us_ack_extracted);
+	dsp.nic.tx_channel()->sigh_ready_to_submit(_ds_pkt_extracted);
+	dsp.nic.tx_channel()->sigh_ack_avail      (_ds_ack_submitted);
+}	
+
+template<Server::Event E>
+void Server::Diode::dispatch(unsigned nsignals)
+{
+	PDBG("Server::Diode::dispatch; Received signal %d\n", static_cast<unsigned>(E));
+	_nsignals = nsignals;
+	Base::dispatch(E);
+	PDBG("Server::Diode::dispatch, after; %d\n", static_cast<unsigned>(E));
+}
+
+Server::Diode::Diode(Allocator & a, Entrypoint & ep)
+	: _reporter         ("status"),
+	  _bytes_streamed   (0),
+	  _pkts_streamed    (0),
+	  _nsignals         (0),
+	  _config_updated   (ep, * this, & Diode::dispatch<Event::CONFIG_UPDATED>),
+	  _report_status    (ep, * this, & Diode::dispatch<Event::REPORT_STATUS>),
+	  _us_pkt_submitted (ep, * this, & Diode::dispatch<Event::US_PKT_SUBMITTED>),
+	  _us_ack_extracted (ep, * this, & Diode::dispatch<Event::US_ACK_EXTRACTED>),
+	  _ds_pkt_extracted (ep, * this, & Diode::dispatch<Event::DS_PKT_EXTRACTED>),
+	  _ds_ack_submitted (ep, * this, & Diode::dispatch<Event::DS_ACK_SUBMITTED>),
+	  cfg               (),
+	  status_timer      (),
+	  usp               (a, BUF_SZ, "out"),
+	  dsp               (a, BUF_SZ, "in")
+{
+	PDBG("Server::Diode::Diode\n");
+	connect_signals();
+};
+
+void Server::Diode::update_config()
+{
+	config()->reload();
+	cfg.blocking = config()->xml_node().attribute_value("blocking", false);
+	cfg.verbose = config()->xml_node().attribute_value("verbose", false);
+	cfg.report_period = config()->xml_node().attribute_value("report_interval", 1000000u);
+	status_timer.trigger_periodic(cfg.report_period);
+	PDBG("cfg.     blocking: %d\n", cfg.blocking);
+	PDBG("cfg.      verbose: %d\n", cfg.verbose);
+	PDBG("cfg.report_period: %d\n", cfg.report_period);
+}
+
+void Server::Diode::report_status()
+{
+	PDBG("Entering Server::Diode::report_status()\n");
+	Reporter::Xml_generator xml(_reporter, [&] () {
+			xml.attribute("StreamedBytes", _bytes_streamed);
+			xml.attribute("StreamedPkts", _pkts_streamed);
+		});
+	PDBG("Leaving Server::Diode::report_status()\n");
+}
+
+void Server::Diode::receive_acks()
+{
+	while (dsp.nic.tx()->ack_avail())	{
+		PDBG("downstream release packet\n");
+		dsp.nic.tx()->release_packet(dsp.nic.tx()->get_acked_packet());
+	}
+}
+
+void Server::Diode::forward_pkts()
+{
+	while (usp.nic.rx()->packet_avail()
+			 && usp.nic.rx()->ready_to_ack()
+			 && dsp.nic.tx()->ready_to_submit()) {
+		Packet_descriptor const us_pkt = usp.nic.rx()->get_packet();
+		Packet_descriptor ds_pkt;
+		try {
+			ds_pkt = dsp.nic.tx()->alloc_packet(us_pkt.size());
+		}
+		catch (...) {
+			return;
+		}
+		Genode::memcpy(dsp.nic.tx()->packet_content(ds_pkt),
+							usp.nic.rx()->packet_content(us_pkt), us_pkt.size());
+		dsp.nic.tx()->submit_packet(ds_pkt);
+		usp.nic.rx()->acknowledge_packet(us_pkt);
+		_pkts_streamed++;
+		_bytes_streamed += us_pkt.size();
+	}
 }
