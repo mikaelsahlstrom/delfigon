@@ -1,0 +1,392 @@
+diff -Naur orig/src/lib/botan/src/lib/asn1/oid_lookup/oids.cpp new/src/lib/botan/src/lib/asn1/oid_lookup/oids.cpp
+--- orig/src/lib/botan/src/lib/asn1/oid_lookup/oids.cpp	2016-01-27 12:15:39.151147788 +0100
++++ new/src/lib/botan/src/lib/asn1/oid_lookup/oids.cpp	2016-02-03 10:04:33.019191670 +0100
+@@ -7,9 +7,10 @@
+ 
+ #include <botan/oids.h>
+ #include <botan/parsing.h>
+-#include <mutex>
+ #include <sstream>
+ 
++#include <botan/genode.h>
++
+ namespace Botan {
+ 
+ namespace OIDS {
+diff -Naur orig/src/lib/botan/src/lib/base/algo_registry.h new/src/lib/botan/src/lib/base/algo_registry.h
+--- orig/src/lib/botan/src/lib/base/algo_registry.h	2016-01-27 12:15:38.819141854 +0100
++++ new/src/lib/botan/src/lib/base/algo_registry.h	2016-01-28 18:52:18.040387818 +0100
+@@ -11,12 +11,13 @@
+ #include <botan/types.h>
+ #include <functional>
+ #include <stdexcept>
+-#include <mutex>
+ #include <vector>
+ #include <map>
+ #include <string>
+ #include <unordered_map>
+ 
++#include <botan/genode.h>
++
+ #if defined(_MSC_VER) && (_MSC_VER <= 1800)
+ 
+    #define BOTAN_WORKAROUND_GH_321
+diff -Naur orig/src/lib/botan/src/lib/base/scan_name.h new/src/lib/botan/src/lib/base/scan_name.h
+--- orig/src/lib/botan/src/lib/base/scan_name.h	2016-01-27 12:46:00.380665475 +0100
++++ new/src/lib/botan/src/lib/base/scan_name.h	2016-01-27 12:21:50.285576476 +0100
+@@ -11,9 +11,10 @@
+ #include <botan/types.h>
+ #include <string>
+ #include <vector>
+-#include <mutex>
+ #include <map>
+ 
++#include <botan/genode.h>
++
+ namespace Botan {
+ 
+ /**
+diff -Naur orig/src/lib/botan/src/lib/cert/x509/x509path.cpp new/src/lib/botan/src/lib/cert/x509/x509path.cpp
+--- orig/src/lib/botan/src/lib/cert/x509/x509path.cpp	2016-01-27 12:15:38.891143141 +0100
++++ new/src/lib/botan/src/lib/cert/x509/x509path.cpp	2016-02-03 11:13:37.743129079 +0100
+@@ -83,7 +83,7 @@
+ 
+    X509_Time current_time(std::chrono::system_clock::now());
+ 
+-   std::vector<std::future<OCSP::Response>> ocsp_responses;
++   std::vector<OCSP::Response> ocsp_responses;
+ 
+    std::vector<std::set<Certificate_Status_Code>> cert_status(cert_path.size());
+ 
+@@ -101,9 +101,7 @@
+          {
+          // certstore[0] is treated as trusted for OCSP (FIXME)
+          if(certstores.size() > 1)
+-            ocsp_responses.push_back(
+-               std::async(std::launch::async,
+-                          OCSP::online_check, issuer, subject, certstores[0]));
++            ocsp_responses.push_back(OCSP::online_check(issuer, subject, certstores[0]));
+          }
+ 
+       // Check all certs for valid time range
+@@ -156,7 +154,7 @@
+          {
+          try
+             {
+-            OCSP::Response ocsp = ocsp_responses[i].get();
++            OCSP::Response ocsp = ocsp_responses[i];
+ 
+             auto ocsp_status = ocsp.status_for(ca, subject);
+ 
+diff -Naur orig/src/lib/botan/src/lib/entropy/egd/es_egd.h new/src/lib/botan/src/lib/entropy/egd/es_egd.h
+--- orig/src/lib/botan/src/lib/entropy/egd/es_egd.h	2016-01-27 12:15:38.903143355 +0100
++++ new/src/lib/botan/src/lib/entropy/egd/es_egd.h	2016-02-02 11:13:52.811303044 +0100
+@@ -11,7 +11,8 @@
+ #include <botan/entropy_src.h>
+ #include <string>
+ #include <vector>
+-#include <mutex>
++
++#include <botan/genode.h>
+ 
+ namespace Botan {
+ 
+diff -Naur orig/src/lib/botan/src/lib/filters/basefilt.h new/src/lib/botan/src/lib/filters/basefilt.h
+--- orig/src/lib/botan/src/lib/filters/basefilt.h	2016-01-27 12:15:38.915143570 +0100
++++ new/src/lib/botan/src/lib/filters/basefilt.h	2016-01-28 14:40:49.634768818 +0100
+@@ -10,7 +10,6 @@
+ #define BOTAN_BASEFILT_H__
+ 
+ #include <botan/filter.h>
+-#include <thread>
+ 
+ namespace Botan {
+ 
+@@ -78,6 +77,7 @@
+       Fork(Filter* filter_arr[], size_t length);
+    };
+ 
++#if 0
+ /**
+ * This class is a threaded version of the Fork filter. While this uses
+ * threads, the class itself is NOT thread-safe. This is meant as a drop-
+@@ -113,6 +113,7 @@
+       std::vector<std::shared_ptr<std::thread>> m_threads;
+       std::unique_ptr<struct Threaded_Fork_Data> m_thread_data;
+    };
++#endif
+ 
+ }
+ 
+diff -Naur orig/src/lib/botan/src/lib/filters/filter.h new/src/lib/botan/src/lib/filters/filter.h
+--- orig/src/lib/botan/src/lib/filters/filter.h	2016-01-27 12:15:38.919143641 +0100
++++ new/src/lib/botan/src/lib/filters/filter.h	2016-01-28 13:26:27.666018960 +0100
+@@ -164,7 +164,6 @@
+       void attach(Filter* f) { Filter::attach(f); }
+ 
+    private:
+-      friend class Threaded_Fork;
+       using Filter::write_queue;
+       using Filter::total_ports;
+       using Filter::next;
+diff -Naur orig/src/lib/botan/src/lib/filters/threaded_fork.cpp new/src/lib/botan/src/lib/filters/threaded_fork.cpp
+--- orig/src/lib/botan/src/lib/filters/threaded_fork.cpp	2016-01-27 12:15:38.927143785 +0100
++++ new/src/lib/botan/src/lib/filters/threaded_fork.cpp	2016-01-28 12:34:38.577305044 +0100
+@@ -6,6 +6,7 @@
+ * Botan is released under the Simplified BSD License (see license.txt)
+ */
+ 
++#if 0
+ #include <botan/basefilt.h>
+ #include <botan/internal/semaphore.h>
+ 
+@@ -144,3 +145,4 @@
+    }
+ 
+ }
++#endif
+diff -Naur orig/src/lib/botan/src/lib/pubkey/dsa/dsa.cpp new/src/lib/botan/src/lib/pubkey/dsa/dsa.cpp
+--- orig/src/lib/botan/src/lib/pubkey/dsa/dsa.cpp	2016-01-27 12:15:39.051146000 +0100
++++ new/src/lib/botan/src/lib/pubkey/dsa/dsa.cpp	2016-02-02 11:02:27.750278287 +0100
+@@ -11,7 +11,6 @@
+ #include <botan/pow_mod.h>
+ #include <botan/reducer.h>
+ #include <botan/rfc6979.h>
+-#include <future>
+ 
+ namespace Botan {
+ 
+@@ -113,11 +112,8 @@
+ 
+    const BigInt k = generate_rfc6979_nonce(x, q, i, m_hash);
+ 
+-   auto future_r = std::async(std::launch::async,
+-                              [&]() { return mod_q.reduce(powermod_g_p(k)); });
+-
+    BigInt s = inverse_mod(k, q);
+-   const BigInt r = future_r.get();
++   const BigInt r = mod_q.reduce(powermod_g_p(k));
+    s = mod_q.multiply(s, mul_add(x, r, i));
+ 
+    // With overwhelming probability, a bug rather than actual zero r/s
+@@ -179,11 +175,8 @@
+ 
+    s = inverse_mod(s, q);
+ 
+-   auto future_s_i = std::async(std::launch::async,
+-      [&]() { return powermod_g_p(mod_q.multiply(s, i)); });
+-
+    BigInt s_r = powermod_y_p(mod_q.multiply(s, r));
+-   BigInt s_i = future_s_i.get();
++   BigInt s_i = powermod_g_p(mod_q.multiply(s, i));
+ 
+    s = mod_p.multiply(s_i, s_r);
+ 
+diff -Naur orig/src/lib/botan/src/lib/pubkey/nr/nr.cpp new/src/lib/botan/src/lib/pubkey/nr/nr.cpp
+--- orig/src/lib/botan/src/lib/pubkey/nr/nr.cpp	2016-01-27 12:15:39.071146358 +0100
++++ new/src/lib/botan/src/lib/pubkey/nr/nr.cpp	2016-02-03 10:02:09.516518814 +0100
+@@ -9,7 +9,6 @@
+ #include <botan/nr.h>
+ #include <botan/keypair.h>
+ #include <botan/reducer.h>
+-#include <future>
+ 
+ namespace Botan {
+ 
+@@ -181,10 +180,9 @@
+    if(c.is_zero() || c >= q || d >= q)
+       throw Invalid_Argument("NR verification: Invalid signature");
+ 
+-   auto future_y_c = std::async(std::launch::async, powermod_y_p, c);
+    BigInt g_d = powermod_g_p(d);
+ 
+-   BigInt i = mod_p.multiply(g_d, future_y_c.get());
++   BigInt i = mod_p.multiply(g_d, powermod_y_p(c));
+    return BigInt::encode_locked(mod_q.reduce(c - i));
+    }
+ }
+diff -Naur orig/src/lib/botan/src/lib/pubkey/rsa/rsa.cpp new/src/lib/botan/src/lib/pubkey/rsa/rsa.cpp
+--- orig/src/lib/botan/src/lib/pubkey/rsa/rsa.cpp	2016-01-27 12:15:39.079146502 +0100
++++ new/src/lib/botan/src/lib/pubkey/rsa/rsa.cpp	2016-02-03 10:13:45.678541070 +0100
+@@ -11,7 +11,6 @@
+ #include <botan/keypair.h>
+ #include <botan/blinding.h>
+ #include <botan/reducer.h>
+-#include <future>
+ 
+ namespace Botan {
+ 
+@@ -95,9 +94,8 @@
+ 
+       BigInt private_op(const BigInt& m) const
+          {
+-         auto future_j1 = std::async(std::launch::async, m_powermod_d1_p, m);
+          BigInt j2 = m_powermod_d2_q(m);
+-         BigInt j1 = future_j1.get();
++         BigInt j1 = m_powermod_d1_p(m);
+ 
+          j1 = m_mod_p.reduce(sub_mul(j1, j2, c));
+ 
+diff -Naur orig/src/lib/botan/src/lib/pubkey/rw/rw.cpp new/src/lib/botan/src/lib/pubkey/rw/rw.cpp
+--- orig/src/lib/botan/src/lib/pubkey/rw/rw.cpp	2016-01-27 12:15:39.083146573 +0100
++++ new/src/lib/botan/src/lib/pubkey/rw/rw.cpp	2016-02-03 10:14:20.559399600 +0100
+@@ -12,7 +12,6 @@
+ #include <botan/reducer.h>
+ #include <botan/blinding.h>
+ #include <algorithm>
+-#include <future>
+ 
+ namespace Botan {
+ 
+@@ -117,9 +116,8 @@
+ 
+    i = blinder.blind(i);
+ 
+-   auto future_j1 = std::async(std::launch::async, powermod_d1_p, i);
+    const BigInt j2 = powermod_d2_q(i);
+-   BigInt j1 = future_j1.get();
++   BigInt j1 = powermod_d1_p(i);
+ 
+    j1 = mod_p.reduce(sub_mul(j1, j2, c));
+ 
+diff -Naur orig/src/lib/botan/src/lib/pubkey/workfactor.cpp new/src/lib/botan/src/lib/pubkey/workfactor.cpp
+--- orig/src/lib/botan/src/lib/pubkey/workfactor.cpp	2016-01-27 12:15:39.083146573 +0100
++++ new/src/lib/botan/src/lib/pubkey/workfactor.cpp	2016-02-03 11:06:10.125942622 +0100
+@@ -8,6 +8,7 @@
+ #include <botan/workfactor.h>
+ #include <algorithm>
+ #include <cmath>
++#include <math.h>
+ 
+ namespace Botan {
+ 
+@@ -23,12 +24,12 @@
+    const double k = .02;
+ 
+    // approximates natural logarithm of p
+-   const double log2_e = std::log2(std::exp(1));
++   const double log2_e = log2(std::exp(1));
+    const double log_p = bits / log2_e;
+ 
+    const double est = 1.92 * std::pow(log_p * std::log(log_p) * std::log(log_p), 1.0/3.0);
+ 
+-   return static_cast<size_t>(std::log2(k) + log2_e * est);
++   return static_cast<size_t>(log2(k) + log2_e * est);
+    }
+ 
+ size_t dl_work_factor(size_t bits)
+@@ -46,7 +47,7 @@
+    (this only matters for very small primes).
+    */
+    const size_t MIN_WORKFACTOR = 64;
+-   const double log2_e = std::log2(std::exp(1));
++   const double log2_e = log2(std::exp(1));
+    const double log_p = bits / log2_e;
+ 
+    const double strength = 1.92 * std::pow(log_p, 1.0/3.0) * std::pow(std::log(log_p), 2.0/3.0);
+diff -Naur orig/src/lib/botan/src/lib/rng/rng.h new/src/lib/botan/src/lib/rng/rng.h
+--- orig/src/lib/botan/src/lib/rng/rng.h	2016-01-27 12:15:39.087146645 +0100
++++ new/src/lib/botan/src/lib/rng/rng.h	2016-01-29 15:54:21.246881812 +0100
+@@ -12,7 +12,8 @@
+ #include <botan/exceptn.h>
+ #include <chrono>
+ #include <string>
+-#include <mutex>
++
++#include <botan/genode.h>
+ 
+ namespace Botan {
+ 
+diff -Naur orig/src/lib/botan/src/lib/tls/tls_session_manager.h new/src/lib/botan/src/lib/tls/tls_session_manager.h
+--- orig/src/lib/botan/src/lib/tls/tls_session_manager.h	2016-01-27 12:15:39.123147288 +0100
++++ new/src/lib/botan/src/lib/tls/tls_session_manager.h	2016-02-03 08:36:59.626882556 +0100
+@@ -9,10 +9,11 @@
+ #define BOTAN_TLS_SESSION_MANAGER_H__
+ 
+ #include <botan/tls_session.h>
+-#include <mutex>
+ #include <chrono>
+ #include <map>
+ 
++#include <botan/genode.h>
++
+ namespace Botan {
+ 
+ namespace TLS {
+diff -Naur orig/src/lib/botan/src/lib/utils/http_util/http_util.cpp new/src/lib/botan/src/lib/utils/http_util/http_util.cpp
+--- orig/src/lib/botan/src/lib/utils/http_util/http_util.cpp	2016-01-27 12:15:39.135147503 +0100
++++ new/src/lib/botan/src/lib/utils/http_util/http_util.cpp	2016-02-03 08:48:55.468206792 +0100
+@@ -219,10 +219,12 @@
+    return http_sync("POST", url, content_type, body, allowable_redirects);
+    }
+ 
++#if 0
+ std::future<Response> GET_async(const std::string& url, size_t allowable_redirects)
+    {
+    return std::async(std::launch::async, GET_sync, url, allowable_redirects);
+    }
++#endif
+ 
+ }
+ 
+diff -Naur orig/src/lib/botan/src/lib/utils/http_util/http_util.h new/src/lib/botan/src/lib/utils/http_util/http_util.h
+--- orig/src/lib/botan/src/lib/utils/http_util/http_util.h	2016-01-27 12:15:39.135147503 +0100
++++ new/src/lib/botan/src/lib/utils/http_util/http_util.h	2016-02-03 08:48:27.743697955 +0100
+@@ -9,7 +9,6 @@
+ #define BOTAN_UTILS_URLGET_H__
+ 
+ #include <botan/types.h>
+-#include <future>
+ #include <vector>
+ #include <map>
+ #include <chrono>
+@@ -87,8 +86,10 @@
+                              const std::vector<byte>& body,
+                              size_t allowable_redirects = 1);
+ 
++#if 0
+ std::future<Response> BOTAN_DLL GET_async(const std::string& url,
+                                                     size_t allowable_redirects = 1);
++#endif
+ 
+ BOTAN_DLL std::string url_encode(const std::string& url);
+ 
+diff -Naur orig/src/lib/botan/src/lib/utils/locking_allocator/locking_allocator.cpp new/src/lib/botan/src/lib/utils/locking_allocator/locking_allocator.cpp
+--- orig/src/lib/botan/src/lib/utils/locking_allocator/locking_allocator.cpp	2016-01-27 12:15:39.135147503 +0100
++++ new/src/lib/botan/src/lib/utils/locking_allocator/locking_allocator.cpp	2016-02-03 09:38:01.977839789 +0100
+@@ -11,7 +11,8 @@
+ #include <algorithm>
+ #include <cstdlib>
+ #include <string>
+-#include <mutex>
++
++#include <botan/genode.h>
+ 
+ namespace Botan {
+ 
+diff -Naur orig/src/lib/botan/src/lib/utils/locking_allocator/locking_allocator.h new/src/lib/botan/src/lib/utils/locking_allocator/locking_allocator.h
+--- orig/src/lib/botan/src/lib/utils/locking_allocator/locking_allocator.h	2016-01-27 12:15:39.139147574 +0100
++++ new/src/lib/botan/src/lib/utils/locking_allocator/locking_allocator.h	2016-01-27 14:13:00.329116512 +0100
+@@ -10,7 +10,8 @@
+ 
+ #include <botan/types.h>
+ #include <vector>
+-#include <mutex>
++
++#include <botan/genode.h>
+ 
+ namespace Botan {
+ 
+diff -Naur orig/src/lib/botan/src/lib/utils/semaphore.h new/src/lib/botan/src/lib/utils/semaphore.h
+--- orig/src/lib/botan/src/lib/utils/semaphore.h	2016-01-27 12:15:39.143147646 +0100
++++ new/src/lib/botan/src/lib/utils/semaphore.h	2016-02-03 10:24:34.077139501 +0100
+@@ -8,8 +8,7 @@
+ #ifndef BOTAN_SEMAPHORE_H__
+ #define BOTAN_SEMAPHORE_H__
+ 
+-#include <mutex>
+-#include <condition_variable>
++#include <botan/genode.h>
+ 
+ namespace Botan {
+ 
